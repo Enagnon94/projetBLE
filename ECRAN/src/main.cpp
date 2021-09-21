@@ -27,7 +27,7 @@ void setup() {
   BLEDevice::init("");
   pBLEScan = BLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
+  pBLEScan->setActiveScan(false);
   pBLEScan->setInterval(100);
   pBLEScan->setWindow(99);  // less or equal setInterval value
 
@@ -42,12 +42,42 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
+  uint32_t nbFoundDevices = foundDevices.getCount();
+
+  for (uint32_t i = 0; i < nbFoundDevices; i++) {
+    BLEAdvertisedDevice foundDevice = foundDevices.getDevice(i);
+
+    BLEAddress address = foundDevice.getAddress();
+
+    if (address.toString() == "58:2d:34:3b:7d:3c") {
+
+      uint8_t* payloadRaw = foundDevice.getPayload();
+      size_t payloadLength = foundDevice.getPayloadLength();
+
+      Serial.println();
+      Serial.print("################################");
+      Serial.println();
+      Serial.printf("BLE:    Result %i [%s] payload: 0x", i, address.toString().c_str());
+      for (int i = 0; i < payloadLength; i++) {
+        Serial.print(payloadRaw[i], HEX);
+        Serial.print(" ");
+      }
+      
+      Serial.println();
+      Serial.print("################################");
+      Serial.println();
+    }
+    
+  }
+
   Serial.print("Devices found: ");
   Serial.println(foundDevices.getCount());
   Serial.println("Scan done!");
   pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
-  delay(2000);
   tft.fillScreen(TFT_BLACK);
   tft.setCursor(100, 100);
   tft.println(foundDevices.getCount());
+
+  delay(2000);
+
 }
