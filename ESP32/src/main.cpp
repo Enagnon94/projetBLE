@@ -23,27 +23,35 @@ public:
   int16_t battery_level = -1;
 };
 
-void displayResult(BLEResult result)
+BLEResult result;
+
+void displayResult()
 {
+  tft.fillScreen(TFT_BLACK);
+
   if (result.temperature > -200.0f)
   {
     Serial.printf("temperature: %.2f", result.temperature);
-    Serial.println();
-
-    // Show temp on screen
-    tft.fillScreen(TFT_BLACK);
-    tft.setCursor(100, 100);
+    Serial.println();    
+    
+    tft.setCursor(80, 80);
     tft.println(result.temperature);
   }
   if (result.humidity > -1.0f)
   {
     Serial.printf("humidity: %.2f", result.humidity);
     Serial.println();
+
+    tft.setCursor(80, 100);
+    tft.println(result.humidity);
   }
   if (result.battery_level > -1)
   {
     Serial.printf("battery_level: %d", result.battery_level);
     Serial.println();
+
+    tft.setCursor(80, 120);
+    tft.println(result.battery_level);
   }
 }
 
@@ -60,8 +68,6 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
 
       uint8_t *payloadRaw = advertisedDevice.getPayload();
       size_t payloadLength = advertisedDevice.getPayloadLength();
-
-      BLEResult result;
 
       Serial.println();
       Serial.println("################################");
@@ -112,7 +118,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
       }
 
       Serial.println();
-      displayResult(result);
+      displayResult();
 
       Serial.println("################################");
     }
@@ -138,7 +144,7 @@ void setup()
   tft.setRotation(1);
   tft.setTextSize(2);
   tft.fillScreen(TFT_BLACK);
-  tft.setCursor(100, 100);
+  tft.setCursor(80, 80);
   tft.println("hello");
 }
 
