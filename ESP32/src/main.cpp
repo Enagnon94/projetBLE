@@ -8,7 +8,13 @@
 #include <BLEUtils.h>
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
-
+// button
+#define BUTTONGAUCHE 0  // btn de gauche 
+#define BUTTONDROITE 35 // btn de droite
+int cptBtnG = 0;   // compteur appui btn de gauche
+int cptBtnD = 0;   // compteur appui btn de droite
+uint32_t textColor[5] ={0x001F,0xAFE5,0x07FF ,0x7BE0 ,0xFFFF};
+//
 int scanTime = 1.5; //In seconds
 BLEScan *pBLEScan;
 
@@ -28,13 +34,17 @@ BLEResult result;
 void displayResult()
 {
   tft.fillScreen(TFT_BLACK);
+   tft.setCursor(100, 60);
+    tft.println("HOME");
 
   if (result.temperature > -200.0f)
   {
     Serial.printf("temperature: %.2f", result.temperature);
     Serial.println();    
     
-    tft.setCursor(80, 80);
+    tft.setCursor(80, 90);
+    tft.println( "T:");
+    tft.setCursor(110, 90);
     tft.println(result.temperature);
   }
   if (result.humidity > -1.0f)
@@ -42,7 +52,9 @@ void displayResult()
     Serial.printf("humidity: %.2f", result.humidity);
     Serial.println();
 
-    tft.setCursor(80, 100);
+    tft.setCursor(80, 120);
+    tft.println( "H:");
+    tft.setCursor(110, 120);
     tft.println(result.humidity);
   }
   if (result.battery_level > -1)
@@ -50,9 +62,13 @@ void displayResult()
     Serial.printf("battery_level: %d", result.battery_level);
     Serial.println();
 
-    tft.setCursor(80, 120);
+    tft.setCursor(80, 150);
+    tft.println( "Power:");
+    tft.setCursor(150, 150);
     tft.println(result.battery_level);
   }
+  if (true){tft.setCursor(65, 200);tft.println( "Connected");}
+  else{tft.setCursor(65, 200);tft.println( "Disconnected");}
 }
 
 // Callback when find device ble
@@ -125,6 +141,25 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
   }
 };
 
+void initDevice(){
+  tft.begin();
+  tft.setRotation(1);
+  tft.setTextSize(2);
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(80, 80);
+  tft.println("Hello");
+  tft.setCursor(80, 120);
+  tft.println("DomoTic");
+  tft.setCursor(80, 170);
+  tft.println("Ver1.07");
+}
+void gestionAppuiBtnGauche(){
+  cptBtnG=cptBtnG+1;
+  if (cptBtnG > 4){cptBtnG=0;}
+  tft.setTextColor(textColor[cptBtnG]);
+  displayResult();
+  }
+
 void setup()
 {
   // Monitor speed
@@ -138,14 +173,12 @@ void setup()
   pBLEScan->setActiveScan(true);
   pBLEScan->setInterval(100);
   pBLEScan->setWindow(99); // less or equal setInterval value
-
+  // gestion appuie btn 
+  attachInterrupt(BUTTONGAUCHE,gestionAppuiBtnGauche,FALLING);
+  //attachInterrupt(BUTTONDROITE,gestionAppuiBtnDroite,FALLING);
   // Initialise screen
-  tft.begin();
-  tft.setRotation(1);
-  tft.setTextSize(2);
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(80, 80);
-  tft.println("hello");
+  initDevice();
+
 }
 
 void loop()
@@ -154,5 +187,5 @@ void loop()
   BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
 
   pBLEScan->clearResults(); // delete results fromBLEScan buffer to release memory
-
+  
 }
