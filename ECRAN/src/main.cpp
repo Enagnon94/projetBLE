@@ -9,28 +9,131 @@
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
 
-int scanTime = 5; //In seconds
-BLEScan* pBLEScan;
+int scanTime = 1.5; //In seconds
+BLEScan *pBLEScan;
 
-TFT_eSPI tft = TFT_eSPI();  // Invoke library, pins defined in User_Setup.h
+TFT_eSPI tft = TFT_eSPI(); // Invoke library, pins defined in User_Setup.h
 
-class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
-    void onResult(BLEAdvertisedDevice advertisedDevice) {
-      Serial.printf("Advertised Device: %s \n", advertisedDevice.toString().c_str());
-    }
+// Result of ble mi temp
+class BLEResult
+{
+public:
+  double temperature = -200.0f;
+  double humidity = -1.0f;
+  int16_t battery_level = -1;
 };
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println("Scanning...");
+void displayResult(BLEResult result)
+{
+  if (result.temperature > -200.0f)
+  {
+    Serial.printf("temperature: %.2f", result.temperature);
+    Serial.println();
 
+    // Show temp on screen
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(100, 100);
+    tft.println(result.temperature);
+  }
+  if (result.humidity > -1.0f)
+  {
+    Serial.printf("humidity: %.2f", result.humidity);
+    Serial.println();
+  }
+  if (result.battery_level > -1)
+  {
+    Serial.printf("battery_level: %d", result.battery_level);
+    Serial.println();
+  }
+}
+
+// Callback when find device ble
+class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
+{
+  void onResult(BLEAdvertisedDevice advertisedDevice)
+  {
+    BLEAddress address = advertisedDevice.getAddress();
+
+    // Filter by mac address of mi temp
+    if (address.toString() == "58:2d:34:3b:7d:3c")
+    {
+
+      uint8_t *payloadRaw = advertisedDevice.getPayload();
+      size_t payloadLength = advertisedDevice.getPayloadLength();
+
+      BLEResult result;
+
+      Serial.println();
+      Serial.println("################################");
+      Serial.print("Raw: ");
+
+      // For each data of ble advertise
+      for (int i = 0; i < payloadLength; i++)
+      {
+        // Show the data
+        Serial.printf("%02X ", payloadRaw[i]);
+
+        // Need min 3 char to start to check
+        if (i > 3)
+        {
+          uint8_t raw = payloadRaw[i - 3];     // type
+          uint8_t check = payloadRaw[i - 2];   // must always be 0x10
+          int data_length = payloadRaw[i - 1]; // length of data
+
+          if (check == 0x10)
+          {
+            // temperature, 2 bytes, 16-bit signed integer (LE), 0.1 °C
+            if ((raw == 0x04) && (data_length == 2) && (i + data_length < payloadLength))
+            {
+              const int16_t temperature = uint16_t(payloadRaw[i + 0]) | (uint16_t(payloadRaw[i + 1]) << 8);
+              result.temperature = temperature / 10.0f;
+            }
+            // humidity, 2 bytes, 16-bit signed integer (LE), 0.1 %
+            else if ((raw == 0x06) && (data_length == 2) && (i + data_length < payloadLength))
+            {
+              const int16_t humidity = uint16_t(payloadRaw[i + 0]) | (uint16_t(payloadRaw[i + 1]) << 8);
+              result.humidity = humidity / 10.0f;
+            }
+            // battery, 1 byte, 8-bit unsigned integer, 1 %
+            else if ((raw == 0x0A) && (data_length == 1) && (i + data_length < payloadLength))
+            {
+              result.battery_level = payloadRaw[i + 0];
+            }
+            // temperature + humidity, 4 bytes, 16-bit signed integer (LE) each, 0.1 °C, 0.1 %
+            else if ((raw == 0x0D) && (data_length == 4) && (i + data_length < payloadLength))
+            {
+              const int16_t temperature = uint16_t(payloadRaw[i + 0]) | (uint16_t(payloadRaw[i + 1]) << 8);
+              const int16_t humidity = uint16_t(payloadRaw[i + 2]) | (uint16_t(payloadRaw[i + 3]) << 8);
+              result.temperature = temperature / 10.0f;
+              result.humidity = humidity / 10.0f;
+            }
+          }
+        }
+      }
+
+      Serial.println();
+      displayResult(result);
+
+      Serial.println("################################");
+    }
+  }
+};
+
+void setup()
+{
+  // Monitor speed
+  Serial.begin(115200);
+
+  // Initialise BLE scan
+  Serial.println("Scanning...");
   BLEDevice::init("");
   pBLEScan = BLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setActiveScan(false);
+  pBLEScan->setActiveScan(true);
   pBLEScan->setInterval(100);
-  pBLEScan->setWindow(99);  // less or equal setInterval value
+  pBLEScan->setWindow(99); // less or equal setInterval value
 
+  // Initialise screen
   tft.begin();
   tft.setRotation(1);
   tft.setTextSize(2);
@@ -39,45 +142,11 @@ void setup() {
   tft.println("hello");
 }
 
-void loop() {
+void loop()
+{
   // put your main code here, to run repeatedly:
   BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
-  uint32_t nbFoundDevices = foundDevices.getCount();
 
-  for (uint32_t i = 0; i < nbFoundDevices; i++) {
-    BLEAdvertisedDevice foundDevice = foundDevices.getDevice(i);
-
-    BLEAddress address = foundDevice.getAddress();
-
-    if (address.toString() == "58:2d:34:3b:7d:3c") {
-
-      uint8_t* payloadRaw = foundDevice.getPayload();
-      size_t payloadLength = foundDevice.getPayloadLength();
-
-      Serial.println();
-      Serial.print("################################");
-      Serial.println();
-      Serial.printf("BLE:    Result %i [%s] payload: 0x", i, address.toString().c_str());
-      for (int i = 0; i < payloadLength; i++) {
-        Serial.print(payloadRaw[i], HEX);
-        Serial.print(" ");
-      }
-      
-      Serial.println();
-      Serial.print("################################");
-      Serial.println();
-    }
-    
-  }
-
-  Serial.print("Devices found: ");
-  Serial.println(foundDevices.getCount());
-  Serial.println("Scan done!");
-  pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(100, 100);
-  tft.println(foundDevices.getCount());
-
-  delay(2000);
+  pBLEScan->clearResults(); // delete results fromBLEScan buffer to release memory
 
 }
